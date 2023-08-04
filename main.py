@@ -2,6 +2,7 @@ import numpy as np
 from tkinter import *
 from tkinter import ttk
 import tkinter.filedialog as tkFileDialog
+import pyglet
 from PIL import Image
 from PIL import ImageTk
 import cv2 as cv
@@ -32,17 +33,24 @@ class App(Tk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         #Inicialiazacao da variaveis globais
+        global zoomValue; zoomValue = IntVar(value=0)
+
+        global flipCheck; flipCheck = BooleanVar(value=False)
+
         global blurCheck; blurCheck = BooleanVar(value= False)
         global blurValue; blurValue = IntVar(value = 1)
 
-        global histogramCheck; histogramCheck = BooleanVar(value= False)
+        global histogramCheck; histogramCheck = BooleanVar(value = False)
 
-        global satCheck; satCheck = BooleanVar(value= False)
+        global satCheck; satCheck = BooleanVar(value = False)
         global satValue; satValue = IntVar(value = 0)
 
-        global bgSubCheck; bgSubCheck = BooleanVar(value= False)
+        global lumaCheck; lumaCheck = BooleanVar(value = False)
+        global lumaValue; lumaValue = IntVar(value = 0)
 
-        global threshCheck; threshCheck = BooleanVar(value= False)
+        global bgSubCheck; bgSubCheck = BooleanVar(value = False)
+
+        global threshCheck; threshCheck = BooleanVar(value = False)
         global lowHueValue; lowHueValue = IntVar(value = 0)
         global lowSatValue; lowSatValue = IntVar(value = 0)
         global lowLumaValue; lowLumaValue = IntVar(value = 0)
@@ -50,8 +58,12 @@ class App(Tk):
         global highSatValue; highSatValue = IntVar(value = 0)
         global highLumaValue; highLumaValue = IntVar(value = 0)
 
+        global barPoint1; barPoint1 = (0,0)
+        global barPoint2; barPoint2 = (0,0)
+        global barTrack; barTrack = BooleanVar(value = False)
         global selectedFace; selectedFace = IntVar(value = -1)
         global barHeigth; barHeigth = 0
+        global barHeightTracking; barHeightTracking = 0
         global headHeigth; headHeigth = 0
         global faceState; faceState = "down"
         global timer; timer = 60.00
@@ -86,9 +98,19 @@ class App(Tk):
  
     def defStyle(self):
         styleManager = ttk.Style()
-        styleManager.configure('sideMenu.TFrame', background='red')
-        styleManager.configure('canvas.TFrame', background='green')
+        styleManager.configure('sideMenu.TFrame', background='gray25')
+        styleManager.configure('canvas.TFrame', background='gray25')
         styleManager.configure('Frame3.TFrame', background='gray')
+        styleManager.configure('gray30.TFrame', background='gray30')
+        styleManager.configure('gray30.TCheckbutton', background='gray30')
+        styleManager.configure('gray30.TLabel', background='gray30',font=('Helvetica', 10, "bold"))
+        styleManager.configure('gray25.TFrame', background='gray25')
+        styleManager.configure('gray25.TLabel', background='gray25',font=('Helvetica', 14, "bold"))
+
+        styleManager.configure('clock.TLabel', background='gray15', foreground = 'red',font=('Digital-7 Mono', 25,'bold'))
+        styleManager.configure('counter.TLabel', background='gray15', foreground = 'green',font=('Digital-7 Mono', 25,'bold'))
+        
+        	
 
     #Cria o tela principal de acrodo com a escolha do usuario.
     def createWidgets(self,mode,pathVideo):
@@ -105,14 +127,17 @@ class App(Tk):
 class SelectMode(ttk.Frame):
     #selectedMode pode ter duas opcões, webcam ou um arquivo de vídeo. 
     selectedMode = None
-    width = 200
-    height = 50
+    width = 400
+    height = 100
     btnFile = None
     btnCam = None
     pathVideo = None
 
     def __init__(self, parent):
         super().__init__(parent)
+        #Carrega os icones
+        self.iconCamera = ImageTk.PhotoImage(Image.open('./assets/camera.png').resize((70, 70)))
+        self.iconVideo = ImageTk.PhotoImage(Image.open('./assets/video.png').resize((70, 70)))
         #Declaração de estilos
         self.defStyle()
         #algumas configurações...
@@ -122,7 +147,11 @@ class SelectMode(ttk.Frame):
         self.selectedMode  = StringVar()
         self.pathVideo = StringVar()
         self.btnFile = ttk.Button(self, text="Video", style ="leave.TButton", command=lambda: self.selectedMode.set("video"))
+        self.btnFile.configure(image = self.iconVideo)
+        self.btnFile.image = self.iconVideo
         self.btnCam = ttk.Button(self, text="Câmera", style="leave.TButton",  command=lambda: self.selectedMode.set("webcam"))
+        self.btnCam.configure(image = self.iconCamera)
+        self.btnCam.image = self.iconCamera
         self.btnFile.pack(side=LEFT,fill=BOTH, expand=True)
         self.btnCam.pack(side=RIGHT,fill=BOTH, expand=True)
         self.pack()
@@ -136,7 +165,7 @@ class SelectMode(ttk.Frame):
 
     def defStyle(self):
         styleManager = ttk.Style()
-        styleManager.configure('leave.TButton', background='gray')
+        styleManager.configure('leave.TButton', background='gray30')
         styleManager.configure('enter.TButton', background='green')
 
 #####################################################################################
@@ -160,14 +189,32 @@ class SideMenu(ttk.Frame):
         self.createWidgets()
 
     def createWidgets(self):
-        title = ttk.Label(self,text = "Menu")
+        title = ttk.Label(self,text = "Menu",style ='gray25.TLabel')
         title.pack_propagate(0)
         title.pack( anchor = N)
 
+        #Zoom
+        self.zoomFrame = ttk.Frame(self, width = self.width, style='gray30.TFrame')
+        self.zoomLabel = ttk.Label(self.zoomFrame,text = "Zoom", style='gray30.TLabel')
+        self.zoomSlider = ttk.Scale(self.zoomFrame, variable = zoomValue, from_= -10 , to = 10, orient = "horizontal")
+        self.zoomSlider.bind('<Double-Button-1>',lambda a: self.zoomSlider.set(0))
+        self.zoomLabel.pack(side = LEFT)
+        self.zoomSlider.pack(side = LEFT,fill=X, expand=True)
+        self.zoomFrame.pack(side=TOP,anchor = N, fill = X)
+
+        #FLIP
+        self.flipFrame = ttk.Frame(self, width = self.width, style='gray30.TFrame')
+        self.flipLabel = ttk.Label(self.flipFrame,text = "Flip", style='gray30.TLabel')
+        self.flipCheckbox = ttk.Checkbutton(self.flipFrame, variable = flipCheck, onvalue = True, offvalue= False , style = 'gray30.TCheckbutton') 
+        self.flipCheckbox.pack(side = LEFT)
+        self.flipLabel.pack(side = LEFT)
+        self.flipFrame.pack(side=TOP,anchor = N, fill = X)
+
+
         #BLUR
-        self.blurFrame = ttk.Frame(self, width = self.width)
-        self.blurLabel = ttk.Label(self.blurFrame,text = "Blur")
-        self.blurCheckbox = ttk.Checkbutton(self.blurFrame, variable = blurCheck, onvalue = True, offvalue= False ) 
+        self.blurFrame = ttk.Frame(self, width = self.width, style='gray30.TFrame')
+        self.blurLabel = ttk.Label(self.blurFrame,text = "Blur", style='gray30.TLabel')
+        self.blurCheckbox = ttk.Checkbutton(self.blurFrame, variable = blurCheck, onvalue = True, offvalue= False , style = 'gray30.TCheckbutton') 
         self.blurSlider = ttk.Scale(self.blurFrame, variable = blurValue, from_= 0 , to =10, orient = "horizontal")
         self.blurCheckbox.pack(side = LEFT)
         self.blurLabel.pack(side = LEFT)
@@ -175,45 +222,57 @@ class SideMenu(ttk.Frame):
         self.blurFrame.pack(side=TOP,anchor = N, fill = X)
 
         #Histogram
-        self.histogramFrame = ttk.Frame(self, width = self.width)
-        self.histogramLabel = ttk.Label(self.histogramFrame,text = "Histogram equalization")
-        self.histogramCheckbox = ttk.Checkbutton(self.histogramFrame, variable = histogramCheck, onvalue = True, offvalue= False ) 
+        self.histogramFrame = ttk.Frame(self, width = self.width,style='gray30.TFrame')
+        self.histogramLabel = ttk.Label(self.histogramFrame,text = "Histogram equalization", style = 'gray30.TLabel')
+        self.histogramCheckbox = ttk.Checkbutton(self.histogramFrame, variable = histogramCheck, onvalue = True, offvalue= False, style = 'gray30.TCheckbutton' ) 
         self.histogramCheckbox.pack(side = LEFT)
         self.histogramLabel.pack(side = LEFT)
         self.histogramFrame.pack(side=TOP,anchor = N, fill = X)
 
         #Saturation
-        self.satFrame = ttk.Frame(self, width = self.width)
-        self.satLabel = ttk.Label(self.satFrame,text = "Saturation")
-        self.satCheckbox = ttk.Checkbutton(self.satFrame, variable = satCheck, onvalue = True, offvalue= False ) 
+        self.satFrame = ttk.Frame(self, width = self.width,style='gray30.TFrame')
+        self.satLabel = ttk.Label(self.satFrame,text = "Saturation", style = 'gray30.TLabel')
+        self.satCheckbox = ttk.Checkbutton(self.satFrame, variable = satCheck, onvalue = True, offvalue= False, style = 'gray30.TCheckbutton' ) 
         self.satSlider = ttk.Scale(self.satFrame, variable = satValue, from_= -255 , to = 255, orient = "horizontal")
         self.satSlider.bind('<Double-Button-1>',lambda a: self.satSlider.set(0))
         self.satSlider.set(0)
         self.satCheckbox.pack(side = LEFT)
         self.satLabel.pack(side = LEFT)
         self.satSlider.pack(side = RIGHT)
-        
         self.satFrame.pack(side=TOP,anchor = N, fill = X)
+        
+        #Luma
+        self.lumaFrame = ttk.Frame(self, width = self.width,style='gray30.TFrame')
+        self.lumaLabel = ttk.Label(self.lumaFrame,text = "Luma", style = 'gray30.TLabel')
+        self.lumaCheckbox = ttk.Checkbutton(self.lumaFrame, variable = lumaCheck, onvalue = True, offvalue= False, style = 'gray30.TCheckbutton' ) 
+        self.lumaSlider = ttk.Scale(self.lumaFrame, variable = lumaValue, from_= -255 , to = 255, orient = "horizontal")
+        self.lumaSlider.bind('<Double-Button-1>',lambda a: self.lumaSlider.set(0))
+        self.lumaSlider.set(0)
+        self.lumaCheckbox.pack(side = LEFT)
+        self.lumaLabel.pack(side = LEFT)
+        self.lumaSlider.pack(side = RIGHT)
+        
+        self.lumaFrame.pack(side=TOP,anchor = N, fill = X)
 
         #BGsubtractor
-        self.bgSubFrame = ttk.Frame(self, width = self.width)
-        self.bgSubLabel = ttk.Label(self.bgSubFrame,text = "BG Subtractor")
-        self.bgSubCheckbox = ttk.Checkbutton(self.bgSubFrame, variable = bgSubCheck, onvalue = True, offvalue= False ) 
+        self.bgSubFrame = ttk.Frame(self, width = self.width,style='gray30.TFrame')
+        self.bgSubLabel = ttk.Label(self.bgSubFrame,text = "BG Subtractor", style = 'gray30.TLabel')
+        self.bgSubCheckbox = ttk.Checkbutton(self.bgSubFrame, variable = bgSubCheck, onvalue = True, offvalue= False, style = 'gray30.TCheckbutton' ) 
         self.bgSubCheckbox.pack(side = LEFT)
         self.bgSubLabel.pack(side = LEFT)
         self.bgSubFrame.pack(side=TOP,anchor = N, fill = X)
 
         #Threshold
-        self.threshFrame = ttk.Frame(self, width = self.width)
-        self.threshFrame1 = ttk.Frame(self.threshFrame, width = self.width)
-        self.threshFrame2 = ttk.Frame(self.threshFrame, width = self.width)
-        self.threshFrame3 = ttk.Frame(self.threshFrame, width = self.width)
-        self.threshFrame4 = ttk.Frame(self.threshFrame, width = self.width)
-        self.threshFrame5 = ttk.Frame(self.threshFrame, width = self.width)
-        self.threshFrame6 = ttk.Frame(self.threshFrame, width = self.width)
+        self.threshFrame = ttk.Frame(self, width = self.width,style='gray30.TFrame')
+        self.threshFrame1 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
+        self.threshFrame2 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
+        self.threshFrame3 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
+        self.threshFrame4 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
+        self.threshFrame5 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
+        self.threshFrame6 = ttk.Frame(self.threshFrame, width = self.width,style='gray30.TFrame')
 
-        self.threshLabel = ttk.Label(self.threshFrame,text = "Threshod")
-        self.threshCheckbox = ttk.Checkbutton(self.threshFrame, variable = threshCheck, onvalue = True, offvalue= False ) 
+        self.threshLabel = ttk.Label(self.threshFrame,text = "Threshod", style = 'gray30.TLabel')
+        self.threshCheckbox = ttk.Checkbutton(self.threshFrame, variable = threshCheck, onvalue = True, offvalue= False, style = 'gray30.TCheckbutton' ) 
         self.lowHueSlider = ttk.Scale(self.threshFrame1, variable = lowHueValue, from_= 0 , to =255, orient = "horizontal")
         self.lowSatSlider = ttk.Scale(self.threshFrame2, variable = lowSatValue, from_= 0 , to =255, orient = "horizontal")
         self.lowLumaSlider = ttk.Scale(self.threshFrame3, variable = lowLumaValue, from_= 0 , to =255, orient = "horizontal")
@@ -221,12 +280,12 @@ class SideMenu(ttk.Frame):
         self.highSatSlider = ttk.Scale(self.threshFrame5, variable = highSatValue, from_= 0 , to =255, orient = "horizontal")
         self.highLumaSlider = ttk.Scale(self.threshFrame6, variable = highLumaValue, from_= 0 , to =255, orient = "horizontal")
 
-        self.lowHueLabel = ttk.Label(self.threshFrame1, text =   "        lowHue    ")
-        self.lowSatLabel = ttk.Label(self.threshFrame2, text =   "        lowSat     ")
-        self.lowLumaLabel = ttk.Label(self.threshFrame3, text =  "        lowLuma ")
-        self.highHueLabel = ttk.Label(self.threshFrame4, text =  "        highHue  ")
-        self.highSatLabel = ttk.Label(self.threshFrame5, text =  "        highSat    ")
-        self.highLumaLabel = ttk.Label(self.threshFrame6, text = "        highLuma")
+        self.lowHueLabel = ttk.Label(self.threshFrame1, text =   "        lowHue    ",style = 'gray30.TLabel')
+        self.lowSatLabel = ttk.Label(self.threshFrame2, text =   "        lowSat     ", style = 'gray30.TLabel')
+        self.lowLumaLabel = ttk.Label(self.threshFrame3, text =  "        lowLuma ", style = 'gray30.TLabel')
+        self.highHueLabel = ttk.Label(self.threshFrame4, text =  "        highHue  ", style = 'gray30.TLabel')
+        self.highSatLabel = ttk.Label(self.threshFrame5, text =  "        highSat    ", style = 'gray30.TLabel')
+        self.highLumaLabel = ttk.Label(self.threshFrame6, text = "        highLuma", style = 'gray30.TLabel')
 
         self.threshFrame6.pack(expand=True, side=BOTTOM, fill = BOTH, anchor=S)
         self.threshFrame5.pack(expand=True, side=BOTTOM, fill = BOTH, anchor=S)
@@ -259,8 +318,49 @@ class SideMenu(ttk.Frame):
         
         self.threshFrame.pack( side=TOP, fill = X)
 
+        #Dumb frame
+        self.dumbFrame = ttk.Frame(self, width = self.width, style='gray25.TFrame') 
+        self.dumbFrame.pack( side=TOP, fill = X, expand= True)
+
+        #Set bar and Select face
+        self.setBarFrame = ttk.Frame(self, width = self.width, style = 'gray30.TFrame') 
+        self.setBarButton = ttk.Button(self.setBarFrame, text="Set Bar", command= canvas.setBar)
+        self.setFaceText = ttk.Label(self.setBarFrame, text =   "                       Select Face:",style = 'gray30.TLabel')
+        self.setFace = ttk.Spinbox(self.setBarFrame, from_=0, to=100, textvariable= selectedFace,wrap=True,width=40)
 
         
+        self.setBarButton.pack( side=LEFT, fill = X,anchor=N)
+        # self.barTrackCheckbox.pack( side=LEFT, fill = X,anchor=N)
+        self.setFaceText .pack( side=LEFT,anchor=N,expand=True, fill = BOTH)
+        
+        self.setFace.pack_propagate(0)
+        self.setFace.pack()
+        self.setBarFrame.pack( side=TOP, fill = X)
+
+        #Start count
+        global timer
+        global barCount
+        self.gameFrame = ttk.Frame(self,width= 100,style = 'gray30.TFrame')
+        self.startButton = ttk.Button(self.gameFrame, text="Start", command = self.start)
+        self.startButton.pack_propagate(0)
+        self.resetButton = ttk.Button(self.gameFrame, text="Reset", command = self.reset)
+        self.timerLabel = ttk.Label(self.gameFrame, text=str(timer), style='clock.TLabel')
+        self.counterLabel = ttk.Label(self.gameFrame, text=str(barCount), style = 'counter.TLabel')
+        
+        self.gameFrame.pack(side=TOP)
+        self.counterLabel.pack(fill=BOTH, side=LEFT, expand=True)
+        self.startButton.pack( side=LEFT)
+        self.resetButton.pack(fill=X, side=LEFT)
+        self.timerLabel.pack(fill=BOTH, side=LEFT)
+
+        
+        self.counterFrame = ttk.Frame(self)
+        
+
+        self.counterFrame.pack(side=TOP)
+        
+
+
         #Start stop play and next
         self.playerFrame = ttk.Frame(self, width= 300)
         self.playButton = ttk.Button(self.playerFrame, command = self.play)
@@ -282,47 +382,22 @@ class SideMenu(ttk.Frame):
         self.nextButton.image = self.iconNext
 
 
-        self.playerFrame.pack(expand=True,anchor=N)
+        self.playerFrame.pack(expand=True,anchor=S)
         self.playButton.pack( side=LEFT)
         self.stopButton.pack( side=LEFT)
         self.continueButton.pack( side=LEFT)
         self.previousButton.pack( side=LEFT)
         self.nextButton.pack( side=LEFT)
-        #Set bar and Select face
-        self.setBarFrame = ttk.Frame(self, width = self.width)
-        self.setBarButton = ttk.Button(self.setBarFrame, text="Set Bar", command= canvas.setBar)
-        self.setFaceText = ttk.Label(self.setBarFrame, text =   "                       Select Face:")
-        self.setFace = ttk.Spinbox(self.setBarFrame, from_=0, to=100, textvariable= selectedFace,wrap=True,width=40)
 
-        
-        self.setBarButton.pack( side=LEFT, fill = X,anchor=N,)
-        self.setFaceText .pack( side=LEFT,anchor=N,expand=True, fill = BOTH)
-        
-        self.setFace.pack_propagate(0)
-        self.setFace.pack()
-        self.setBarFrame.pack( side=TOP, fill = X)
-
-        #Start count
+    def reset(self):
+        global run
         global timer
-        self.gameFrame = ttk.Frame(self,width= 100)
-        self.startButton = ttk.Button(self.gameFrame, text="Start", command = self.start)
-        self.startButton.pack_propagate(0)
-        self.resetButton = ttk.Button(self.gameFrame, text="Reset")
-        self.timerLabel = ttk.Label(self.gameFrame, text=str(timer))
-
-        self.gameFrame.pack(side=TOP)
-        self.startButton.pack( side=LEFT)
-        self.resetButton.pack(fill=X, side=LEFT)
-        self.timerLabel.pack(fill=X, side=LEFT)
-
-        global barCount
-        self.counterFrame = ttk.Frame(self)
-        self.counterLabel = ttk.Label(self.counterFrame, text=str(barCount))
-
-        self.counterFrame.pack(side=TOP)
-        self.counterLabel.pack(fill=X, side=TOP, expand=True)
-
-
+        timer = 60.00
+        run = False
+        self.contadorBarras.reset()
+        timerStr = "{:.2f}".format(timer)
+        self.timerLabel.configure(text=timerStr)
+        
 
     def start(self):
         global run
@@ -336,7 +411,7 @@ class SideMenu(ttk.Frame):
         global run
         global barCount
         self.counterLabel.configure(text=barCount)
-        if(timer > 0.00):
+        if(timer > 0.00 and run):
             self.contadorBarras.countBar()
             timerStr = "{:.2f}".format(timer)
             self.timerLabel.configure(text=timerStr)
@@ -346,12 +421,7 @@ class SideMenu(ttk.Frame):
             run = False
             timer = 60.0
 
-            
-
-
-
-
-
+        
     def play(self):
         global isPlaying
         global atualFrame
@@ -394,6 +464,7 @@ class ContadorBarras():
                     self.state = 1
             elif(self.state == 1):
                 if(faceState == "up"):
+                    print("bar")
                     self.state = 2
                     barCount += 1
             elif(self.state == 2):
@@ -401,8 +472,11 @@ class ContadorBarras():
                     self.state = 0
 
     def reset(self):
+        global barCount
+        barCount = 0
         self.state = 0 
         self.counter = 0
+
 
 
 
@@ -421,8 +495,7 @@ class CanvasArea(ttk.Frame):
     style = "canvas.TFrame"
     clickBar = 2
     mouseCoord = None
-    barPoint1 = (0,0)
-    barPoint2 = (0,0)
+    
 
     def __init__(self,parent,path, mode):
         super().__init__(parent)
@@ -447,7 +520,15 @@ class CanvasArea(ttk.Frame):
         self.canvasLabel.create_image( 250,200,image = img)
         self.canvasLabel.image = img
         #Draw the bar
-        self.canvasLabel.create_line(self.barPoint1[0],self.barPoint1[1],self.barPoint2[0],self.barPoint2[1],width = 10,fill = "purple",)
+        self.drawBar()
+    
+    #Draw bar with or whithout tracking
+    def drawBar(self):
+        global barPoint1
+        global barPoint2
+        global barHeightTracking
+        global barTrack
+        self.canvasLabel.create_line(barPoint1[0],barPoint1[1],barPoint2[0],barPoint2[1],width = 10,fill = "purple",)
         self.canvasLabel.pack(side=LEFT,padx=10,pady=10)
 
     def play(self):
@@ -456,22 +537,27 @@ class CanvasArea(ttk.Frame):
         self.canvasLabel.after(self.videoPipeline.deltaTime, self.play)
         
     def setBar(self):
+        global barPoint1
+        global barPoint2
         #Clean the bar
-        self.barPoint1 = (0,0)
-        self.barPoint2 = (0,0)
+        barPoint1 = (0,0)
+        barPoint2 = (0,0)
         #clickbar
         self.clickBar = 0
 
     def mouseClick(self,event):
+        global barPoint1
+        global barPoint2
+        global canvas
         print("click")
         global barHeigth
         if(self.clickBar == 0):
-            self.barPoint1 = self.mouseCoord
-            self.barPoint2 = (self.barPoint1[0]+10, self.barPoint1[1])
-            barHeigth = self.barPoint1[1]
+            barPoint1 = self.mouseCoord
+            barPoint2 = (barPoint1[0]+10, barPoint1[1])
+            barHeigth = barPoint1[1]
             self.clickBar = 1
         elif(self.clickBar == 1):
-            self.barPoint2 = (self.mouseCoord[0], self.barPoint1[1])
+            barPoint2 = (self.mouseCoord[0], barPoint1[1])
             self.clickBar = 2
             
     def setMouseCoordinates(self,event):
@@ -490,6 +576,7 @@ class CanvasArea(ttk.Frame):
 #Todos os filtros esta'o aqui
 class VideoPipeline():
     cap = None
+    img = None
     firstFrame = None
     bufferFrame = None
     heightCanvas = None
@@ -540,7 +627,6 @@ class VideoPipeline():
         #facedetect
         self.fd = faceDetect()
 
-
     #Captura o frame
     def capture(self):
         global isPlaying
@@ -573,15 +659,57 @@ class VideoPipeline():
     #Renderiza um frame do cap
     def render(self):
         img = self.capture()
+        img = self.zoom(img)
         img = self.autoFit(img)
+        img = self.flip(img)
         img = self.blur(img)        #blur
         img = self.histogram(img)   #histogram equalization
         img = self.saturation(img)  #saturation adjust
+        img = self.luma(img)  #Luma adjust
         img = self.bgSub(img)       #bg subtractor
         img = self.tresh(img)       #Threshold
         img = self.fd.detect(img)
         return img
     
+    def zoom(self, img):
+        altura, largura = img.shape[:2]
+        if(zoomValue.get() > 0):
+            scaleFactor = zoomValue.get()
+            nova_altura = int(altura * scaleFactor)
+            nova_largura = int(largura * scaleFactor)
+            imagem_ampliada = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
+
+            corte_vertical = int((nova_altura - altura) / 2)
+            corte_horizontal = int((nova_largura - largura) / 2)
+
+            imagem_cortada = imagem_ampliada[corte_vertical:corte_vertical+altura, corte_horizontal:corte_horizontal+largura]
+        elif(zoomValue.get() < 0):
+            scaleFactor = 1.00 - float((zoomValue.get()*-1)*0.1)
+            nova_altura = int(altura * scaleFactor)
+            nova_largura = int(largura * scaleFactor)
+
+            imagem_reduzida = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
+
+            dif_altura = altura - nova_altura
+            dif_largura = largura - nova_largura
+            pad_vertical_topo = dif_altura // 2
+            pad_vertical_base = dif_altura - pad_vertical_topo
+            pad_horizontal_esquerda = dif_largura // 2
+            pad_horizontal_direita = dif_largura - pad_horizontal_esquerda
+            imagem_cortada = cv.copyMakeBorder(imagem_reduzida, pad_vertical_topo, pad_vertical_base, pad_horizontal_esquerda, pad_horizontal_direita, cv.BORDER_CONSTANT, value=(0, 0, 0))
+        else:
+            scaleFactor = 1
+            nova_altura = int(altura * scaleFactor)
+            nova_largura = int(largura * scaleFactor)
+            imagem_ampliada = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
+
+            corte_vertical = int((nova_altura - altura) / 2)
+            corte_horizontal = int((nova_largura - largura) / 2)
+
+            imagem_cortada = imagem_ampliada[corte_vertical:corte_vertical+altura, corte_horizontal:corte_horizontal+largura]
+
+        return imagem_cortada
+
 
     #faz o autofit da imagem para a resolução do Canvas
     def autoFit(self, img):
@@ -608,7 +736,11 @@ class VideoPipeline():
             img_resize = img_resize[int(centerOffsetI):int(centerOffsetF), :,:]
 
         return img_resize
-
+    #Flip img
+    def flip(self, img):
+        if(flipCheck.get()):
+            img = cv.flip(img, 1)
+        return img
     #Aplica o efeito blur
     def blur(self, img):
         if(blurCheck.get()):
@@ -640,6 +772,21 @@ class VideoPipeline():
             imgSat_16 = np.clip(imgSat_16,0,255)
             imgSat = imgSat_16.astype(np.uint8)
             imgHSV[:,:,1] = imgSat
+            img = cv.cvtColor(imgHSV, cv.COLOR_HSV2BGR)
+            return img 
+        else:
+            return img 
+        
+    #Ajuste de saturacao
+    def luma(self, img):
+        if(lumaCheck.get()):
+            imgHSV = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+            imgLuma = imgHSV[:,:,2]
+            imgLuma_16 = imgLuma.astype(np.int16)
+            imgLuma_16 += lumaValue.get()
+            imgLuma_16 = np.clip(imgLuma_16,0,255)
+            imgLuma = imgLuma_16.astype(np.uint8)
+            imgHSV[:,:,2] = imgLuma
             img = cv.cvtColor(imgHSV, cv.COLOR_HSV2BGR)
             return img 
         else:
@@ -722,13 +869,7 @@ class faceDetect():
         
         return img
     
-
-
-
-        
     
-
-
 if __name__ == "__main__":
     app = App()
     app.mainloop()
