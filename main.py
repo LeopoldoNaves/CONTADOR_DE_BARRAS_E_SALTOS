@@ -2,7 +2,6 @@ import numpy as np
 from tkinter import *
 from tkinter import ttk
 import tkinter.filedialog as tkFileDialog
-import pyglet
 from PIL import Image
 from PIL import ImageTk
 import cv2 as cv
@@ -103,9 +102,9 @@ class App(Tk):
         styleManager.configure('Frame3.TFrame', background='gray')
         styleManager.configure('gray30.TFrame', background='gray30')
         styleManager.configure('gray30.TCheckbutton', background='gray30')
-        styleManager.configure('gray30.TLabel', background='gray30',font=('Helvetica', 10, "bold"))
+        styleManager.configure('gray30.TLabel', background='gray30',font=('FreeMono', 10, "bold"))
         styleManager.configure('gray25.TFrame', background='gray25')
-        styleManager.configure('gray25.TLabel', background='gray25',font=('Helvetica', 14, "bold"))
+        styleManager.configure('gray25.TLabel', background='gray25',font=('FreeMono', 14, "bold"))
 
         styleManager.configure('clock.TLabel', background='gray15', foreground = 'red',font=('Digital-7 Mono', 25,'bold'))
         styleManager.configure('counter.TLabel', background='gray15', foreground = 'green',font=('Digital-7 Mono', 25,'bold'))
@@ -196,7 +195,7 @@ class SideMenu(ttk.Frame):
         #Zoom
         self.zoomFrame = ttk.Frame(self, width = self.width, style='gray30.TFrame')
         self.zoomLabel = ttk.Label(self.zoomFrame,text = "Zoom", style='gray30.TLabel')
-        self.zoomSlider = ttk.Scale(self.zoomFrame, variable = zoomValue, from_= -10 , to = 10, orient = "horizontal")
+        self.zoomSlider = ttk.Scale(self.zoomFrame, variable = zoomValue, from_= -100 , to = 100, orient = "horizontal")
         self.zoomSlider.bind('<Double-Button-1>',lambda a: self.zoomSlider.set(0))
         self.zoomLabel.pack(side = LEFT)
         self.zoomSlider.pack(side = LEFT,fill=X, expand=True)
@@ -280,11 +279,11 @@ class SideMenu(ttk.Frame):
         self.highSatSlider = ttk.Scale(self.threshFrame5, variable = highSatValue, from_= 0 , to =255, orient = "horizontal")
         self.highLumaSlider = ttk.Scale(self.threshFrame6, variable = highLumaValue, from_= 0 , to =255, orient = "horizontal")
 
-        self.lowHueLabel = ttk.Label(self.threshFrame1, text =   "        lowHue    ",style = 'gray30.TLabel')
-        self.lowSatLabel = ttk.Label(self.threshFrame2, text =   "        lowSat     ", style = 'gray30.TLabel')
+        self.lowHueLabel = ttk.Label(self.threshFrame1, text =   "        lowHue  ",style = 'gray30.TLabel')
+        self.lowSatLabel = ttk.Label(self.threshFrame2, text =   "        lowSat  ", style = 'gray30.TLabel')
         self.lowLumaLabel = ttk.Label(self.threshFrame3, text =  "        lowLuma ", style = 'gray30.TLabel')
-        self.highHueLabel = ttk.Label(self.threshFrame4, text =  "        highHue  ", style = 'gray30.TLabel')
-        self.highSatLabel = ttk.Label(self.threshFrame5, text =  "        highSat    ", style = 'gray30.TLabel')
+        self.highHueLabel = ttk.Label(self.threshFrame4, text =  "        highHue ", style = 'gray30.TLabel')
+        self.highSatLabel = ttk.Label(self.threshFrame5, text =  "        highSat ", style = 'gray30.TLabel')
         self.highLumaLabel = ttk.Label(self.threshFrame6, text = "        highLuma", style = 'gray30.TLabel')
 
         self.threshFrame6.pack(expand=True, side=BOTTOM, fill = BOTH, anchor=S)
@@ -325,7 +324,7 @@ class SideMenu(ttk.Frame):
         #Set bar and Select face
         self.setBarFrame = ttk.Frame(self, width = self.width, style = 'gray30.TFrame') 
         self.setBarButton = ttk.Button(self.setBarFrame, text="Set Bar", command= canvas.setBar)
-        self.setFaceText = ttk.Label(self.setBarFrame, text =   "                       Select Face:",style = 'gray30.TLabel')
+        self.setFaceText = ttk.Label(self.setBarFrame, text =   "           Select Face:",style = 'gray30.TLabel')
         self.setFace = ttk.Spinbox(self.setBarFrame, from_=0, to=100, textvariable= selectedFace,wrap=True,width=40)
 
         
@@ -355,12 +354,8 @@ class SideMenu(ttk.Frame):
 
         
         self.counterFrame = ttk.Frame(self)
-        
-
         self.counterFrame.pack(side=TOP)
         
-
-
         #Start stop play and next
         self.playerFrame = ttk.Frame(self, width= 300)
         self.playButton = ttk.Button(self.playerFrame, command = self.play)
@@ -405,6 +400,7 @@ class SideMenu(ttk.Frame):
         self.contadorBarras.reset()
         self.contadorBarras.countBar()
         self.contador()
+        self.cont()
 
     def contador(self):
         global timer
@@ -420,8 +416,7 @@ class SideMenu(ttk.Frame):
         else:
             run = False
             timer = 60.0
-
-        
+    
     def play(self):
         global isPlaying
         global atualFrame
@@ -443,8 +438,6 @@ class SideMenu(ttk.Frame):
     def prev(self):
         global atualFrame
         atualFrame -= 1
-
-
 
 class ContadorBarras():
     state = 0
@@ -476,14 +469,6 @@ class ContadorBarras():
         barCount = 0
         self.state = 0 
         self.counter = 0
-
-
-
-
-    
-
-    
-        
 
 ####################################################################################
 #Classe qeu define o canvas
@@ -674,7 +659,7 @@ class VideoPipeline():
     def zoom(self, img):
         altura, largura = img.shape[:2]
         if(zoomValue.get() > 0):
-            scaleFactor = zoomValue.get()
+            scaleFactor = pow(1.01, zoomValue.get())
             nova_altura = int(altura * scaleFactor)
             nova_largura = int(largura * scaleFactor)
             imagem_ampliada = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
@@ -684,24 +669,17 @@ class VideoPipeline():
 
             imagem_cortada = imagem_ampliada[corte_vertical:corte_vertical+altura, corte_horizontal:corte_horizontal+largura]
         elif(zoomValue.get() < 0):
-            scaleFactor = 1.00 - float((zoomValue.get()*-1)*0.1)
-            nova_altura = int(altura * scaleFactor)
-            nova_largura = int(largura * scaleFactor)
-
-            imagem_reduzida = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
-
-            dif_altura = altura - nova_altura
-            dif_largura = largura - nova_largura
-            pad_vertical_topo = dif_altura // 2
-            pad_vertical_base = dif_altura - pad_vertical_topo
-            pad_horizontal_esquerda = dif_largura // 2
-            pad_horizontal_direita = dif_largura - pad_horizontal_esquerda
-            imagem_cortada = cv.copyMakeBorder(imagem_reduzida, pad_vertical_topo, pad_vertical_base, pad_horizontal_esquerda, pad_horizontal_direita, cv.BORDER_CONSTANT, value=(0, 0, 0))
+            scaleFactor = float((zoomValue.get()*-1) * 0.1)
+            pad_vertical_topo = int(altura * scaleFactor )
+            pad_vertical_base = int(altura * scaleFactor )
+            pad_horizontal_esquerda = int(largura* scaleFactor )
+            pad_horizontal_direita = int(largura* scaleFactor )
+            imagem_cortada = cv.copyMakeBorder(img, pad_vertical_topo, pad_vertical_base, pad_horizontal_esquerda, pad_horizontal_direita, cv.BORDER_CONSTANT, value=(0, 0, 0))
         else:
             scaleFactor = 1
             nova_altura = int(altura * scaleFactor)
             nova_largura = int(largura * scaleFactor)
-            imagem_ampliada = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_LINEAR)
+            imagem_ampliada = cv.resize(img, (nova_largura, nova_altura), interpolation=cv.INTER_CUBIC )
 
             corte_vertical = int((nova_altura - altura) / 2)
             corte_horizontal = int((nova_largura - largura) / 2)
