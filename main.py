@@ -1,3 +1,5 @@
+#TRABALHO GRUPO OLHAR DIGITAL
+#LEOPOLDO KENJI SUGATA NAVES RA:11201722022
 import numpy as np
 from tkinter import *
 from tkinter import ttk
