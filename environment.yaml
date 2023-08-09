@@ -1,0 +1,6 @@
+name: contador_barras
+channels:
+  - defaults
+dependencies:
+  - opencv=4.5.5
+  - pillow
