@@ -389,6 +389,10 @@ class SideMenu(ttk.Frame):
     def reset(self):
         global run
         global timer
+        global isPlaying
+        global atualFrame
+        atualFrame = 0
+        isPlaying = False
         timer = 60.00
         run = False
         self.contadorBarras.reset()
@@ -398,6 +402,8 @@ class SideMenu(ttk.Frame):
 
     def start(self):
         global run
+        global timer
+        timer = 60.00
         run = True
         self.contadorBarras.reset()
         self.contadorBarras.countBar()
@@ -435,11 +441,11 @@ class SideMenu(ttk.Frame):
 
     def next(self):
         global atualFrame
-        atualFrame += 1
+        atualFrame += 15
 
     def prev(self):
         global atualFrame
-        atualFrame -= 1
+        atualFrame -= 15
 
 class ContadorBarras():
     state = 0
